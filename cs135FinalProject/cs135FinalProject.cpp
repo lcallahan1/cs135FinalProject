@@ -10,6 +10,7 @@
 #include <cmath> // for pow()
 #include <algorithm> // for max()
 
+
 using namespace std;
 
 //The "main menu", user chooses to continue as "student" or "teacher".
