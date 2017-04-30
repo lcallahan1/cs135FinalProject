@@ -9,9 +9,16 @@
 #include <ctime> //RNG  need to seed system time for "truly" random numbers
 #include <cmath> // for pow()
 #include <algorithm> // for max()
+#include <conio.h>  // for _kbhit() and _getch()
 
 
 using namespace std;
+
+//Global constants
+const int ROWS = 5; //for 5 rows
+const int COLS = 5; //for 5 columns
+const char BUZZERS[] = { 'a', 'k', 'v', 't' }; //buzzer letters and exit key
+
 
 //The "main menu", user chooses to continue as "student" or "teacher".
 void studentTeacher();
@@ -46,11 +53,17 @@ string happyResponse();
 // Takes in players, names, and gives "buzzer letter".
 void jeopardyMenu();
 // Displays the board in preparation for play.
-void displayBoard(int[5][5]);
+void displayBoard(string names[], int round);
 // Initialize board if new game
-void newGame(int round);
+void newGame(string filename);
 //
-void playGame();
+void playGame(string names[]);
+void writeGame(string filename, int gameData[5][5]);
+//void readGame(string filename, int** gameData);
+string gameFileName(string names[3]);
+bool mathQuestion(char mathType, int magnitude, bool negatives);
+//
+void playNormalRound(string names[], int round);
 
 
 
@@ -145,13 +158,13 @@ void teacherSettings()
 	}
 	if (choice == 1) // If they wish to change the percentage required to pass...
 	{
-		string percentage = readFile("storage/passing_percentage.txt");//read in percentage from file where it's stored
+		string percentage = readFile("passing_percentage.txt");//read in percentage from file where it's stored
 		cout << "The current percentage is " << percentage << "%, to what would you like to change the passing percentage?" << endl;
 		cin >> percentage; //new percentage
 		system("CLS");
 		cout << "The new percentage required to pass a level is " << percentage << "%.  Please press \"ENTER\" to continue." << endl; //display new percentage
 		system("pause"); //to press enter
-		writeFile("storage/passing_percentage.txt", percentage);  //output new percentage, i.e. write to passing_percentage file
+		writeFile("passing_percentage.txt", percentage);  //output new percentage, i.e. write to passing_percentage file
 		system("CLS");
 	}
 }
@@ -258,14 +271,24 @@ void levelMenu(string name, char mathType, string mathPath)
 	ifstream inFile;
 	int level;
 	int percentage;
-	inFile.open("storage/passing_percentage.txt"); //open percentage file
-	inFile >> percentage; //read in current passing percentage from file where it's stored
+	inFile.open("passing_percentage.txt"); //open percentage file
+	if (inFile.good()) {
+		inFile >> percentage; //read in current passing percentage from file where it's stored
+	}
+	else {
+		percentage = 75;
+		ofstream outFile;
+		outFile.open("passing_percentage.txt");
+		outFile << percentage;
+		outFile.close();
+
+	}
 	inFile.close();
 	const int TOTAL_LEVELS = 10;
 	// initializing array with 10 items, so 0's are in each array space in the file initially.
 	int scores[TOTAL_LEVELS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	//parameter is filepath to operater folder, and then to student's name
-	readScores("storage/" + mathPath + "/" + name + ".txt", scores);
+	readScores(mathPath + "_" + name + ".txt", scores);
 	//User sees only levels available to them (1 and those passed up to).
 	cout << "Your unlocked levels: " << endl << endl;
 	int indexCounter = 0;
@@ -279,13 +302,93 @@ void levelMenu(string name, char mathType, string mathPath)
 	if (level > 0 && level <= indexCounter) //if level choice is within 1 and passed into levels
 	{//chosen operator with index location (example: level 1 is [0] index).
 		quiz(level, mathType, scores[level - 1]);
-		writeFile("storage/" + mathPath + "/" + name + ".txt", scores, TOTAL_LEVELS);
+		writeFile(mathPath + "_" + name + ".txt", scores, TOTAL_LEVELS);
 	}
 	else
 	{
 		cout << "Invalid selection." << endl; // error message, level out of bounds
 	}
 }
+
+bool mathQuestion(char mathType, int magnitude, bool negatives)
+{
+	bool correct = false;
+	int answer; //answer entered by student
+	int quotient; // need quotient and remainder so division can be calculated and entered "long" way instead of with a float (calculator way)
+	int remainder; // above
+
+	int num1 = randNum(magnitude, negatives); //calling randNum function with levels and sublevels parameters
+	int num2 = randNum(magnitude, negatives);
+	if (mathType == '/' && num2 == 0) // For divison, if denominator is 0, add 1 to denominator
+									  // so that we don't try and divide by 0. 
+	{
+		num2 += 1;
+	}
+
+	cout << endl << num1 << " " << mathType << " " << num2 << "  =  "; //display equation and prompt for answer
+	switch (mathType)
+	{
+	case '+':
+		cin >> answer;
+		if (answer == (num1 + num2)) //if correct
+		{
+			correct = true; //add 1 to correct question count to determine quiz score
+			cout << happyResponse() << endl << endl; //display congradulatory response, call function which randomates list of responses
+		}
+		else {
+			// or incorrect (could probably do this outside switch statement, but this is easier for division)
+			cout << "Incorrect. The answer is " << (num1 + num2) << "." << endl //shows correct answer right away
+				<< crappyResponse() << endl << endl; //display response, call function which randomates list of "wrong" responses
+		}
+		break;
+	case '-':
+		cin >> answer;
+		if (answer == (num1 - num2))
+		{
+			correct = true;
+			cout << happyResponse() << endl << endl;
+		}
+		else {
+			cout << "Incorrect. The answer is " << (num1 - num2) << "." << endl
+				<< crappyResponse() << endl << endl;
+		}
+		break;
+	case '*':
+		cin >> answer;
+		if (answer == (num1 * num2))
+		{
+			correct = true;
+			cout << happyResponse() << endl << endl;
+		}
+		else
+		{
+			cout << "Incorrect. The answer is " << (num1 * num2) << "." << endl
+				<< crappyResponse() << endl << endl;
+		}
+		break;
+	case '/':
+		//if (num2 == 0) //cannot divide by zero, so if denominator is 0
+		//num2 += 1; // add one to the denominator so it is no longer 0
+		cout << "please enter quotient (without remainder):  ";
+		cin >> quotient;
+		cout << "and remainder:  ";
+		cin >> remainder;
+		if ((quotient == (num1 / num2)) && (remainder == (num1 % num2))) // if both parts (quotient and remainder) are correct
+		{
+			correct = true; //add 1 to correct count
+			cout << happyResponse() << endl << endl; //display response
+		}
+		else
+		{
+			cout << "Incorrect. The answer is " << (num1 / num2) << " with R = " << (num1 % num2) << "." << endl
+				//displays correct answer, broken up with quotient and remainder
+				<< crappyResponse() << endl << endl;
+		}
+		break;
+	}
+	return correct;
+}
+
 //Runs math quiz of appropriate operator, level and saves score in name file.
 //Char mathType here because we are pulling in the paramenter from operatorMenu, and
 //passing scores in the array as a reference so the score stored in file is actually updated.
@@ -296,9 +399,6 @@ void quiz(int level, char mathType, int &score)
 	//of 1 for level 1&2, 2 for 3&4, etc..
 	int magnitude = (level / 2) + (level % 2); // ^^
 	bool negatives = (level % 2 == 0); // B levels are all even (2, 4, 6, 8, 10), so if even, allow negative numbers
-	int answer; //answer entered by student
-	int quotient; // need quotient and remainder so division can be calculated and entered "long" way instead of with a float (calculator way)
-	int remainder; // above
 	int questions; //10 questions total
 	int correctCount = 0; //initiating correct question count at 0, when student's answer is correct
 	ifstream inFile; //to pull in passing percentage from file
@@ -317,70 +417,14 @@ void quiz(int level, char mathType, int &score)
 			int index = randNum(0, 3);
 			mathType = mathTypes[index]; //index varies 0-3
 		}
-		int num1 = randNum(magnitude, negatives); //calling randNum function with levels and sublevels parameters
-		int num2 = randNum(magnitude, negatives);
-		if (mathType == '/' && num2 == 0) // For divison, if denominator is 0, add 1 to denominator
-										  // so that we don't try and divide by 0. 
-		{
-			num2 += 1;
-		}
 
-		cout << endl << num1 << " " << mathType << " " << num2 << "  =  "; //display equation and prompt for answer
-		switch (mathType)
-		{
-		case '+':
-			cin >> answer;
-			if (answer == (num1 + num2)) //if correct
-			{
-				correctCount++; //add 1 to correct question count to determine quiz score
-				cout << happyResponse() << endl << endl; //display congradulatory response, call function which randomates list of responses
-			}
-			else // or incorrect (could probably do this outside switch statement, but this is easier for division)
-				cout << "Incorrect. The answer is " << (num1 + num2) << "." << endl //shows correct answer right away
-				<< crappyResponse() << endl << endl; //display response, call function which randomates list of "wrong" responses
-			break;
-		case '-':
-			cin >> answer;
-			if (answer == (num1 - num2))
-			{
-				correctCount++;
-				cout << happyResponse() << endl << endl;
-			}
-			else
-				cout << "Incorrect. The answer is " << (num1 - num2) << "." << endl
-				<< crappyResponse() << endl << endl;
-			break;
-		case '*':
-			cin >> answer;
-			if (answer == (num1 * num2))
-			{
-				correctCount++;
-				cout << happyResponse() << endl << endl;
-			}
-			else
-				cout << "Incorrect. The answer is " << (num1 * num2) << "." << endl
-				<< crappyResponse() << endl << endl;
-			break;
-		case '/':
-			//if (num2 == 0) //cannot divide by zero, so if denominator is 0
-			//num2 += 1; // add one to the denominator so it is no longer 0
-			cout << "please enter quotient (without remainder):  ";
-			cin >> quotient;
-			cout << "and remainder:  ";
-			cin >> remainder;
-			if ((quotient == (num1 / num2)) && (remainder == (num1 % num2))) // if both parts (quotient and remainder) are correct
-			{
-				correctCount++; //add 1 to correct count
-				cout << happyResponse() << endl << endl; //display response
-			}
-			else
-				cout << "Incorrect. The answer is " << (num1 / num2) << " with R = " << (num1 % num2) << "." << endl
-				//displays correct answer, broken up with quotient and remainder
-				<< crappyResponse() << endl << endl;
-			break;
+		// TODO: Subject to renaming/reworking
+		bool correct = mathQuestion(mathType, magnitude, negatives); //function returns bool value
+		if (correct) {
+			correctCount++;
 		}
 	}
-	inFile.open("storage/passing_percentage.txt"); //open percentage file
+	inFile.open("passing_percentage.txt"); //open percentage file
 	inFile >> percentage; //read in current passing percentage from file where it's stored
 	inFile.close();
 	int currentScore = correctCount * 10;
@@ -397,6 +441,8 @@ void quiz(int level, char mathType, int &score)
 	system("pause"); //wait for key press to clear screen
 	system("CLS"); //clear screen after they hit any key
 }
+
+
 //Generates random number, with proper number of digits for level and negative numbers for B levels.
 int randNum(int level, bool negatives)
 {
@@ -463,33 +509,46 @@ string crappyResponse()
 void jeopardyMenu()
 {
 	int numPlayers;
-	int points[5][5];
-	string names[3];
-	char buzz[] = {'a', 'k', 'v'};
+	//int points[5][5];
+	string names[3] = { "","","" }; //initialize all 3 name values so that nameGameFile function doesn't pull in random memory info
+	char buzz[] = { 'a', 'k', 'v' };
 
-	points = initializeBoard(1);
-
-	cout << "Welcome to the Math Board Game. Would you like to play a game with 2 or 3 players?" << endl;
-	cin >> numPlayers;
-	if (numPlayers > 1 && numPlayers < 4)
+	//points = initializeBoard(1);
+	do {
+		cout << "Welcome to the Math Board Game. Would you like to play a game with 2 or 3 players?" << endl;
+		cin >> numPlayers;
+		 if (numPlayers != 2 && numPlayers != 3)
+			cout << "You may only play this game with 2 or 3 players, please choose again." << endl;
+	} while (numPlayers != 2 && numPlayers != 3);
+	
+	for (int i = 0; i < numPlayers; i++)
 	{
-		for (int i = 0; i < numPlayers; i++)
-		{
-			cout << endl << endl << "Great! Please enter Player " << i + 1 <<"'s first name:   ";
-			cin >> names[i];
-			cout << "Hi," << names[i] << ", your buzzer letter is " << buzz[i] << "." << endl;
-		}
+		cout << endl << endl << "Great! Please enter Player " << i + 1 <<"'s first name:   ";
+		cin >> names[i];
+		cout << "Hi, " << names[i] << ", your buzzer letter is " << buzz[i] << "." << endl;
 	}
-	else
-		cout << "You may only play this game with 2 or 3 players, please choose again." << endl;
 
-	displayBoard(points);
+
+	newGame(gameFileName(names));
+	
+	playGame(names);
 }
 
-void displayBoard(int points[5][5]) //rows, then columns
+string gameFileName(string names[3]) // generating filestream from the player's names automatically. 
+{
+	string fileName;
+
+	for (int i = 0; i < 3; i++)
+	{
+		fileName += names[i] + "_";
+	}
+	return fileName + ".txt";
+}
+
+void displayBoard(string names[], int boardData[5][5], int round) //rows, then columns
 {
 	int roundNum = 0; // round 1 or 2
-	int points[5][5];
+
 	char mathType[] = { '+', '-', '*', '/', '?' };
 	//41
 	cout << "+---------------------------------------+" << endl;
@@ -499,62 +558,186 @@ void displayBoard(int points[5][5]) //rows, then columns
 	cout << "|" << endl;
 	cout << "|=======================================|" << endl;
 
-	for (int i = 0; i < 5; i++) { //rows
-		for (int j = 0; j < 5; j++) { //columns
-			cout << "|  " << (i + 1) * 100 /** roundTwo*/ << "  ";
+	for (int row = 0; row < ROWS; row++) { //rows
+		for (int col = 0; col < COLS; col++) { //columns
+			int pointValue = (row + 1) * 100 * round * boardData[row][col];
+			string displayValue = to_string(pointValue);
+			if (pointValue == 0)
+				displayValue = " x ";
+			cout << "|  " <<  pointValue << "  ";
 		}
 		cout << "|" << endl;
+		if (row != 4) {
+			cout << "|-------+-------+-------+-------+-------|" << endl;
+		}
 	}
 	cout << "+---------------------------------------+" << endl;
-
-	if (points == 0)
-		cout << 'x';
-	else 
-		cout << points << endl;
-	//if box already done, cout << 'x';
-	
 }
 
-void newGame(int round)
+void newGame(string filename)
 {
-	//read in round
 	//write board to file with new game
-	open.file.....
-
 	//round 1 or 2 (3 is "Bonus Round")
-	int round = 1;
-	int points;
 	int points[5][5];
 	for (int i = 0; i < 5; i++) { //rows
 		for (int j = 0; j < 5; j++) { //columns
-			cout << "|  " << (i + 1) * 100 /** roundTwo*/ << "  ";
+			// value is always 1 except for daily doubles (2)
+			points[i][j] = 1; //new game, always round 1
 		}
 	}
-			return points;
-			void playGame();
+	writeGame(filename, points);
 }
 
-	void playGame()
+void playGame(string names[])
+{
+	// TODO: Figure out which round we're resuming
+	int round = 1;
+	if (round == 1)
 	{
-		string choice; 
-		string names[3];
-		answer = ((num1)mathType(num2));
+		playNormalRound(names, 1);
+		playNormalRound(names, 2);
+		//playBonusRound(names);
+	}
+	else if (round == 2)
+	{
+		playNormalRound(names, 2);
+		//playBonusRound(names);
+	}
+	else 
+	{
+		//playBonusRound(names);
+	}
+	// TODO: Congratulate winner
+	// TODO: Clear game files
+	// TODO: return to menu
+}
 
-		//display current players with their points*** read from file
-		// read board from file
+/*void readGame(string filename, int** gameData) 
+{
+	ifstream inFile;
+	inFile.open(filename);
 
-		cout << "It's " << names[i] << "'s turn! Please select a square (example: + 100, for 'addition for 100 points')." << endl;
+	for (int row = 0; row < 5; row++)
+	{
+		for (int col = 0; col < 5; col++)
+		{
+			inFile >> gameData[ROWS][COLS];
+		}
+	}
+}*/
+
+void writeGame(string filename, int gameData[5][5])
+{
+	ofstream outFile;
+	outFile.open(filename); //open existing game file
+
+	for (int row = 0; row < 5; row++)//rows
+	{
+		for (int col = 0; col < 5; col++) //columns
+		{
+			outFile << gameData[row][col] << " ";
+		}
+		outFile << endl;  //or \n if endl doesn't work
+	}
+
+	outFile.close();
+}
+
+bool isRoundComplete(int boardData[5][5]) 
+{
+	int sum = 0;
+
+	for (int row = 0; row < ROWS; row++)
+	{
+		for (int col = 0; col < COLS; col++)
+		{
+			sum += boardData[row][col];
+		}
+	}
+	return sum == 0; //if true, game is over, if false not; returns true or false
+}
+
+void playNormalRound(string names[], int round)
+{
+	int boardData[5][5];
+
+	// READ GAME FROM FILE FUNCTION ///////////////////////
+	// TODO: Read who's turn it is Otherwise...
+	int turnIndex = 0; //correlates to each player, for turn
+
+	ifstream inFile;
+	inFile.open(gameFileName(names));
+
+	for (int row = 0; row < 5; row++)
+	{
+		for (int col = 0; col < 5; col++)
+		{
+			inFile >> boardData[row][col];
+		}
+	}
+	//////////////////////////////////////////////////////
+
+	while (isRoundComplete(boardData) != true) {
+		displayBoard(names, boardData, round);
+
+		string choice;
+
+		//for key press
+		char key;
+		key = 'w'; //initializing key
+
+
+				   //display current players with their points*** read from file
+				   // read board from file
+
+		cout << "It's " << names[turnIndex] << "'s turn! Please select a square (example: +100, for 'addition for 100 points')." << endl;
 		cin >> choice;
+		cout << "CHOICE: " << choice << endl;
+		
+		char mathType = choice[0]; //strings are char arrays; first index in char array is just the math type char
+		// from cstdlibrary, removes that first math type char and a space to leave only points value desired (points)
+		choice.erase(remove(choice.begin(), choice.end(), '+'), choice.end());
+		choice.erase(remove(choice.begin(), choice.end(), '-'), choice.end());
+		choice.erase(remove(choice.begin(), choice.end(), '*'), choice.end());
+		choice.erase(remove(choice.begin(), choice.end(), '/'), choice.end());
+		choice.erase(remove(choice.begin(), choice.end(), '?'), choice.end());
+		choice.erase(remove(choice.begin(), choice.end(), '\n'), choice.end());
+		int points = stoi(choice); //string to integer from above removing the char and space
+		int magnitude = (points / 100 / round);
+		bool negatives = (round == 2);
 
 		//display 1 problem with mathType
+		bool correct = mathQuestion(mathType, magnitude, negatives); //bool will store whether or not it's correct
 
-		cout << "The answer is:  ";
-		cin >> answer;
-		//if correct, save points, show congrats message, cin another choice
-		cout << happyResponse() << endl << endl;
+		/*if correct, save points, show congrats message, cin another choice
+		if (answer == correct)
+		{
+			cout << names[turnIndex] << ", please choose another square." << endl;
+		}
 		//else incorrect, show message, cin another buzzer letter
-		cout << "Sorry, that's incorrect. Would anyone else like to try? [Please buzz in!]" << endl;
-		//if no letter, (timer???*) display correct answer and zero (x) points on board
+		else
+		{
+			cout << "Sorry, that's incorrect. Would anyone else like to try? Please buzz in! If no one would like to answer, please press 'T'." << endl;
+		}
+
+		//key press stuff
+		while (!_kbhit() && (!(key == 'a' || key == 'A' || key == 'v' || key == 'V'
+			|| key == 'p') || key == 'P' /*|| key == 't' || key == 'T'))  //I want enter to be pressed for the "no one wants to answer" part.
+
+			key = _getch();
+
+		switch (key)
+		{
+		case 'a': case 'A': cout << names[0] << ", what's you're answer? " << endl;
+			break;
+		case 'v': case 'V': cout << names[1] << ", what's you're answer? " << endl;
+			break;
+		case 'p': case 'P': cout << names[2] << ", what's you're answer? " << endl;
+			break;
+		}
+
 		//no timer... add 4th buzzer to dictate, " no one wants to answer"
-		
+		//if no letter,  display correct answer and zero (x) points on board*/
 	}
+
+}
