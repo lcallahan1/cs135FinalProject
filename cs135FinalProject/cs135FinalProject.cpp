@@ -17,7 +17,7 @@ using namespace std;
 //Global constants
 const int ROWS = 5; //for 5 rows
 const int COLS = 5; //for 5 columns
-const char BUZZERS[] = { 'a', 'k', 'v', 't' }; //buzzer letters and exit key
+const char BUZZERS[] = { 'a', 'p', 'v', 't' }; //buzzer letters and exit key
 
 
 //The "main menu", user chooses to continue as "student" or "teacher".
@@ -61,10 +61,11 @@ void playGame(string names[]);
 void writeGame(string filename, int gameData[5][5]);
 //void readGame(string filename, int** gameData);
 string gameFileName(string names[3]);
-bool mathQuestion(char mathType, int magnitude, bool negatives);
 //
 void playNormalRound(string names[], int round);
-
+void presentMathQuestion(char mathType, int magnitude, bool negatives, int &num1, int &num2);
+bool isCorrect(char mathType, int num1, int num2, int answer, int remainder);
+void displayQuizResponse(bool correct, char mathType, int num1, int num2);
 
 
 //main only used to initiate the first menu function and to seed RNG
@@ -310,15 +311,10 @@ void levelMenu(string name, char mathType, string mathPath)
 	}
 }
 
-bool mathQuestion(char mathType, int magnitude, bool negatives)
+void presentMathQuestion(char mathType, int magnitude, bool negatives, int &num1, int &num2) 
 {
-	bool correct = false;
-	int answer; //answer entered by student
-	int quotient; // need quotient and remainder so division can be calculated and entered "long" way instead of with a float (calculator way)
-	int remainder; // above
-
-	int num1 = randNum(magnitude, negatives); //calling randNum function with levels and sublevels parameters
-	int num2 = randNum(magnitude, negatives);
+	num1 = randNum(magnitude, negatives); //calling randNum function with levels and sublevels parameters
+	num2 = randNum(magnitude, negatives);
 	if (mathType == '/' && num2 == 0) // For divison, if denominator is 0, add 1 to denominator
 									  // so that we don't try and divide by 0. 
 	{
@@ -326,10 +322,18 @@ bool mathQuestion(char mathType, int magnitude, bool negatives)
 	}
 
 	cout << endl << num1 << " " << mathType << " " << num2 << "  =  "; //display equation and prompt for answer
+}
+
+bool isCorrect(char mathType, int num1, int num2, int answer, int remainder)
+{
+	bool correct = false;
+	//int quotient; // need quotient and remainder so division can be calculated and entered "long" way instead of with a float (calculator way)
+	//int remainder; // above
+
+
 	switch (mathType)
 	{
 	case '+':
-		cin >> answer;
 		if (answer == (num1 + num2)) //if correct
 		{
 			correct = true; //add 1 to correct question count to determine quiz score
@@ -342,7 +346,6 @@ bool mathQuestion(char mathType, int magnitude, bool negatives)
 		}
 		break;
 	case '-':
-		cin >> answer;
 		if (answer == (num1 - num2))
 		{
 			correct = true;
@@ -354,7 +357,6 @@ bool mathQuestion(char mathType, int magnitude, bool negatives)
 		}
 		break;
 	case '*':
-		cin >> answer;
 		if (answer == (num1 * num2))
 		{
 			correct = true;
@@ -369,11 +371,8 @@ bool mathQuestion(char mathType, int magnitude, bool negatives)
 	case '/':
 		//if (num2 == 0) //cannot divide by zero, so if denominator is 0
 		//num2 += 1; // add one to the denominator so it is no longer 0
-		cout << "please enter quotient (without remainder):  ";
-		cin >> quotient;
-		cout << "and remainder:  ";
-		cin >> remainder;
-		if ((quotient == (num1 / num2)) && (remainder == (num1 % num2))) // if both parts (quotient and remainder) are correct
+
+		if ((answer == (num1 / num2)) && (remainder == (num1 % num2))) // if both parts (quotient and remainder) are correct
 		{
 			correct = true; //add 1 to correct count
 			cout << happyResponse() << endl << endl; //display response
@@ -387,6 +386,35 @@ bool mathQuestion(char mathType, int magnitude, bool negatives)
 		break;
 	}
 	return correct;
+}
+
+void displayQuizResponse(bool correct, char mathType, int num1, int num2)
+{
+	if (correct)
+	{
+		cout << happyResponse() << endl << endl;
+	}
+	else
+	{
+		switch (mathType)
+		{
+		case '+':
+			// or incorrect (could probably do this outside switch statement, but this is easier for division)
+			cout << "Incorrect. The answer is " << (num1 + num2) << "." << endl; //shows correct answer right away
+			break;
+		case '-':
+			cout << "Incorrect. The answer is " << (num1 - num2) << "." << endl;
+			break;
+		case '*':
+			cout << "Incorrect. The answer is " << (num1 * num2) << "." << endl;
+			break;
+		case '/':
+			cout << "Incorrect. The answer is " << (num1 / num2) << " with R = " << (num1 % num2) << "." << endl;
+				//displays correct answer, broken up with quotient and remainder
+			break;
+		}
+		cout << crappyResponse() << endl << endl; //display response, call function which randomates list of "wrong" responses
+	}
 }
 
 //Runs math quiz of appropriate operator, level and saves score in name file.
@@ -412,6 +440,8 @@ void quiz(int level, char mathType, int &score)
 	}
 	for (questions = 0; questions < 10; questions++) //display 10 questions each time quiz is started
 	{
+		int num1, num2, answer, remainder;
+
 		if (randomizeMathType)//re-assigning mathType if it is 'C'
 		{
 			int index = randNum(0, 3);
@@ -419,7 +449,22 @@ void quiz(int level, char mathType, int &score)
 		}
 
 		// TODO: Subject to renaming/reworking
-		bool correct = mathQuestion(mathType, magnitude, negatives); //function returns bool value
+		presentMathQuestion(mathType, magnitude, negatives, num1, num2);
+
+		if(mathType == '/') 
+		{
+			cout << "please enter quotient (without remainder):  ";
+			cin >> answer;
+			cout << "and remainder:  ";
+			cin >> remainder;
+		} 
+		else 
+		{
+			cin >> answer;
+		}
+
+		bool correct = isCorrect(mathType, num1, num2, answer, remainder); //function returns bool value
+
 		if (correct) {
 			correctCount++;
 		}
@@ -677,10 +722,12 @@ void playNormalRound(string names[], int round)
 	}
 	//////////////////////////////////////////////////////
 
-	while (isRoundComplete(boardData) != true) {
+	while (isRoundComplete(boardData) != true) 
+	{
 		displayBoard(names, boardData, round);
 
 		string choice;
+		int num1, num2, answer, remainder;
 
 		//for key press
 		char key;
@@ -707,7 +754,42 @@ void playNormalRound(string names[], int round)
 		bool negatives = (round == 2);
 
 		//display 1 problem with mathType
-		bool correct = mathQuestion(mathType, magnitude, negatives); //bool will store whether or not it's correct
+		presentMathQuestion(mathType, magnitude, negatives, num1, num2);
+
+		//key press stuff
+		while (!_kbhit() && (!(key == 'a' || key == 'A' || key == 'v' || key == 'V' || key == 'p') || key == 'P'))  //I want enter to be pressed for the "no one wants to answer" part.
+		{
+			key = _getch();
+			bool correct;
+			switch (key)
+			{
+			case 'a': case 'A':
+				if (mathType == '/')
+				{
+					cout << endl << names[0] << ", what's the quotient?" << endl;
+					cin >> answer;
+					cout << endl << "and remainder? " << endl;
+					cin >> remainder;
+				}
+				else
+				{
+					cout << endl << names[0] << ", what's your answer? " << endl;
+					cin >> answer;
+				}
+				correct = isCorrect(mathType, num1, num2, answer, remainder);
+				if (correct)
+				{
+					cout << "GOOD JOB!" << endl;
+				}
+				break;
+			case 'v': case 'V': 
+				cout << endl << names[1] << ", what's your answer? " << endl;
+				break;
+			case 'p': case 'P': 
+				cout << endl << names[2] << ", what's your answer? " << endl;
+				break;
+			}
+		}
 
 		/*if correct, save points, show congrats message, cin another choice
 		if (answer == correct)
@@ -718,22 +800,6 @@ void playNormalRound(string names[], int round)
 		else
 		{
 			cout << "Sorry, that's incorrect. Would anyone else like to try? Please buzz in! If no one would like to answer, please press 'T'." << endl;
-		}
-
-		//key press stuff
-		while (!_kbhit() && (!(key == 'a' || key == 'A' || key == 'v' || key == 'V'
-			|| key == 'p') || key == 'P' /*|| key == 't' || key == 'T'))  //I want enter to be pressed for the "no one wants to answer" part.
-
-			key = _getch();
-
-		switch (key)
-		{
-		case 'a': case 'A': cout << names[0] << ", what's you're answer? " << endl;
-			break;
-		case 'v': case 'V': cout << names[1] << ", what's you're answer? " << endl;
-			break;
-		case 'p': case 'P': cout << names[2] << ", what's you're answer? " << endl;
-			break;
 		}
 
 		//no timer... add 4th buzzer to dictate, " no one wants to answer"
